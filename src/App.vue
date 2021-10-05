@@ -221,6 +221,17 @@ export default {
     };
   },
 
+  created() {
+    const tickersList = localStorage.getItem("cryptonomicon-tickers");
+
+    if (tickersList) {
+      this.tickers = JSON.parse(tickersList);
+      this.tickers.forEach((ticker) =>
+        this.subscribeToTickerUpdate(ticker.name)
+      );
+    }
+  },
+
   async mounted() {
     const response = await fetch(
       `https://min-api.cryptocompare.com/data/all/coinlist?api_key=f7b2215dbc160c6de3e623e4c9033d61cc562fe5d34186ac4b7e13482dc0a02f`
@@ -258,25 +269,36 @@ export default {
         };
 
         this.tickers.push(newTicker);
+        localStorage.setItem(
+          "cryptonomicon-tickers",
+          JSON.stringify(this.tickers)
+        );
+
+        this.subscribeToTickerUpdate(newTicker.name);
+
         this.ticker = "";
-
-        setInterval(async () => {
-          const response = await fetch(
-            `https://min-api.cryptocompare.com/data/price?fsym=${newTicker.name}&tsyms=USD&api_key=f7b2215dbc160c6de3e623e4c9033d61cc562fe5d34186ac4b7e13482dc0a02f`
-          );
-
-          const data = await response.json();
-
-          this.tickers.find((t) => t.name === newTicker.name).price =
-            data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
-
-          this.graph.push(data.USD);
-        }, 3000);
 
         this.hintCoints = [];
       } else {
         this.isCoinExist = null;
       }
+    },
+
+    subscribeToTickerUpdate(tickerName) {
+      setInterval(async () => {
+        const response = await fetch(
+          `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=f7b2215dbc160c6de3e623e4c9033d61cc562fe5d34186ac4b7e13482dc0a02f`
+        );
+
+        const data = await response.json();
+
+        this.tickers.find((t) => t.name === tickerName).price =
+          data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
+
+        if (this.currentTicker.name === tickerName) {
+          this.graph.push(data.USD);
+        }
+      }, 3000);
     },
 
     removeTicker(tickerToRemove) {
