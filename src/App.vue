@@ -1,5 +1,9 @@
 <template>
-  <div class="container mx-auto flex flex-col items-center bg-gray-100 p-4">
+  <div v-if="loading" className="lds-ripple">
+    <div></div>
+    <div></div>
+  </div>
+  <div v-else class="container mx-auto flex flex-col items-center p-4">
     <div class="container">
       <div class="w-full my-4"></div>
       <section>
@@ -12,6 +16,7 @@
               <input
                 v-model="ticker"
                 @keydown.enter="addTicker"
+                @input="showHint"
                 type="text"
                 name="wallet"
                 id="wallet"
@@ -30,6 +35,22 @@
             </div>
           </div>
         </div>
+        <ul class="flex h-8">
+          <li
+            @click="setTicker($event), addTicker($event)"
+            v-for="(coin, i) in hintCoints.splice(0, 4)"
+            :key="i"
+            class="p-1 mr-2 mt-2 bg-gray-200 text-xs rounded-md cursor-pointer"
+          >
+            {{ coin.Name }}
+          </li>
+        </ul>
+        <p v-if="isCoinExist === false" class="mt-2 text-xs text-red-500">
+          Coin does not exist
+        </p>
+        <p v-if="isCoinExist === true" class="mt-2 text-xs text-red-500">
+          Coin already added
+        </p>
         <button
           @click="addTicker"
           type="button"
@@ -94,7 +115,7 @@
           >
             <div class="px-4 py-5 sm:p-6 text-center">
               <dt class="text-sm font-medium text-gray-500 truncate">
-                {{ t.name }}
+                {{ t.name }} - USD
               </dt>
               <dd class="mt-1 text-3xl font-semibold text-gray-900">
                 {{ t.price }}
@@ -193,37 +214,74 @@ export default {
       tickers: [],
       currentTicker: null,
       graph: [],
+      allCoins: {},
+      hintCoints: [],
+      isCoinExist: null,
+      loading: true,
     };
+  },
+
+  async mounted() {
+    const response = await fetch(
+      `https://min-api.cryptocompare.com/data/all/coinlist?api_key=f7b2215dbc160c6de3e623e4c9033d61cc562fe5d34186ac4b7e13482dc0a02f`
+    );
+
+    const data = await response.json();
+
+    this.allCoins = Object.values(data.Data);
+
+    this.loading = false;
   },
 
   methods: {
     addTicker() {
-      const newTicker = {
-        name: this.ticker,
-        price: "-",
-      };
+      // проlолжают грузится данные после удаления коина в сетинтервале, добавить "коин уже существует"
+      // найти другой список всех коинов
 
-      this.tickers.push(newTicker);
-      this.ticker = "";
+      if (
+        this.tickers.findIndex(
+          (el) => el.name.toLowerCase() === this.ticker.toLowerCase()
+        ) >= 0
+      ) {
+        this.isCoinExist = true;
+        return;
+      }
 
-      setInterval(async () => {
-        const response = await fetch(
-          `https://min-api.cryptocompare.com/data/price?fsym=${newTicker.name}&tsyms=USD&api_key=f7b2215dbc160c6de3e623e4c9033d61cc562fe5d34186ac4b7e13482dc0a02f`
-        );
+      if (
+        this.allCoins.findIndex(
+          (coin) => coin.Name.toLowerCase() === this.ticker.toLowerCase()
+        ) > 0
+      ) {
+        const newTicker = {
+          name: this.ticker.toUpperCase(),
+          price: "-",
+        };
 
-        const data = await response.json();
+        this.tickers.push(newTicker);
+        this.ticker = "";
 
-        this.tickers.find((t) => t.name === newTicker.name).price =
-          data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
+        setInterval(async () => {
+          const response = await fetch(
+            `https://min-api.cryptocompare.com/data/price?fsym=${newTicker.name}&tsyms=USD&api_key=f7b2215dbc160c6de3e623e4c9033d61cc562fe5d34186ac4b7e13482dc0a02f`
+          );
 
-        if (this.currentTicker.name === newTicker.name) {
+          const data = await response.json();
+
+          this.tickers.find((t) => t.name === newTicker.name).price =
+            data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
+
           this.graph.push(data.USD);
-        }
-      }, 3000);
+        }, 3000);
+
+        this.hintCoints = [];
+      } else {
+        this.isCoinExist = null;
+      }
     },
 
     removeTicker(tickerToRemove) {
       this.tickers = this.tickers.filter((ticker) => ticker !== tickerToRemove);
+      this.currentTicker = null;
     },
 
     normalizeGraph() {
@@ -235,9 +293,25 @@ export default {
       );
     },
 
-    selectTicker(ticekr) {
-      this.currentTicker = ticekr;
+    selectTicker(ticker) {
+      this.currentTicker = ticker;
       this.graph = [];
+    },
+
+    showHint() {
+      this.hintCoints = this.allCoins.filter(
+        (coin) =>
+          coin.Name.toLowerCase().includes(this.ticker.toLowerCase()) ||
+          coin.CoinName.toLowerCase().includes(this.ticker.toLowerCase())
+      );
+      this.hintCoints.length === 0
+        ? (this.isCoinExist = false)
+        : (this.isCoinExist = null);
+      this.ticker.length === 0 ? (this.hintCoints = []) : null;
+    },
+
+    setTicker(evt) {
+      this.ticker = evt.target.textContent;
     },
   },
 };
