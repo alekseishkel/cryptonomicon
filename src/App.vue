@@ -96,9 +96,69 @@
 
       <template v-if="tickers.length">
         <hr class="w-full border-t border-gray-600 my-4" />
+        <div>
+          <button
+            class="
+              mr-4
+              my-4
+              inline-flex
+              items-center
+              py-2
+              px-4
+              border border-transparent
+              shadow-sm
+              text-sm
+              leading-4
+              font-medium
+              rounded-full
+              text-white
+              bg-gray-600
+              hover:bg-gray-700
+              transition-colors
+              duration-300
+              focus:outline-none
+              focus:ring-2
+              focus:ring-offset-2
+              focus:ring-gray-500
+            "
+            @click="page--"
+            v-if="page > 1"
+          >
+            Назад</button
+          ><button
+            class="
+              my-4
+              inline-flex
+              items-center
+              py-2
+              px-4
+              border border-transparent
+              shadow-sm
+              text-sm
+              leading-4
+              font-medium
+              rounded-full
+              text-white
+              bg-gray-600
+              hover:bg-gray-700
+              transition-colors
+              duration-300
+              focus:outline-none
+              focus:ring-2
+              focus:ring-offset-2
+              focus:ring-gray-500
+            "
+            @click="page++"
+            v-if="hasNextPage"
+          >
+            Вперед
+          </button>
+          <div>Фильтр: <input type="text" v-model="filter" /></div>
+        </div>
+        <hr class="w-full border-t border-gray-600 my-4" />
         <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div
-            v-for="t in tickers"
+            v-for="t in filterTickers()"
             :key="t"
             @click="selectTicker(t)"
             :class="{
@@ -218,10 +278,25 @@ export default {
       hintCoints: [],
       isCoinExist: null,
       loading: true,
+      page: 1,
+      filter: "",
+      hasNextPage: true,
     };
   },
 
   created() {
+    const windowData = Object.fromEntries(
+      new URL(window.location).searchParams.entries()
+    );
+
+    if (windowData.filter) {
+      this.filter = windowData.filter;
+    }
+
+    if (windowData.page) {
+      this.page = windowData.page;
+    }
+
     const tickersList = localStorage.getItem("cryptonomicon-tickers");
 
     if (tickersList) {
@@ -240,15 +315,11 @@ export default {
     const data = await response.json();
 
     this.allCoins = Object.values(data.Data);
-
     this.loading = false;
   },
 
   methods: {
     addTicker() {
-      // проlолжают грузится данные после удаления коина в сетинтервале, добавить "коин уже существует"
-      // найти другой список всех коинов
-
       if (
         this.tickers.findIndex(
           (el) => el.name.toLowerCase() === this.ticker.toLowerCase()
@@ -277,11 +348,25 @@ export default {
         this.subscribeToTickerUpdate(newTicker.name);
 
         this.ticker = "";
+        this.filter = "";
 
         this.hintCoints = [];
       } else {
         this.isCoinExist = null;
       }
+    },
+
+    filterTickers() {
+      const filteredTickers = this.tickers.filter((ticker) =>
+        ticker.name.toLowerCase().includes(this.filter.toLowerCase())
+      );
+
+      const start = 6 * (this.page - 1);
+      const end = 6 * this.page;
+
+      this.hasNextPage = filteredTickers.length > end;
+
+      return filteredTickers.slice(start, end);
     },
 
     subscribeToTickerUpdate(tickerName) {
@@ -295,7 +380,7 @@ export default {
         this.tickers.find((t) => t.name === tickerName).price =
           data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
 
-        if (this.currentTicker.name === tickerName) {
+        if (this.currentTicker?.name === tickerName) {
           this.graph.push(data.USD);
         }
       }, 3000);
@@ -334,6 +419,24 @@ export default {
 
     setTicker(evt) {
       this.ticker = evt.target.textContent;
+    },
+  },
+
+  watch: {
+    filter() {
+      this.page = 1;
+      window.history.pushState(
+        null,
+        document.title,
+        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
+      );
+    },
+    page() {
+      window.history.pushState(
+        null,
+        document.title,
+        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
+      );
     },
   },
 };
