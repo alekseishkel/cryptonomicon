@@ -178,7 +178,7 @@
                 {{ t.name }} - USD
               </dt>
               <dd class="mt-1 text-3xl font-semibold text-gray-900">
-                {{ t.price }}
+                {{ formatPrice(t.price) }}
               </dd>
             </div>
             <div class="w-full border-t border-gray-200"></div>
@@ -265,7 +265,7 @@
 </template>
 
 <script>
-import { loadTicker } from "./api";
+import { loadTickers } from "./api";
 
 export default {
   name: "App",
@@ -394,37 +394,31 @@ export default {
       }
     },
 
+    formatPrice(price) {
+      if (price === "-") {
+        return price;
+      }
+
+      return price > 1 ? price.toFixed(2) : price.toPrecision(2);
+    },
+
     async updateTickers() {
       if (!this.tickers.length) {
         return;
       }
-      const exchangedData = await loadTicker(
+      const exchangedData = await loadTickers(
         this.tickers.map((ticker) => ticker.name)
       );
 
       this.tickers.forEach((ticker) => {
         const price = exchangedData[ticker.name.toUpperCase()];
 
-        if (!price) {
-          ticker.price = "-";
-          return;
+        ticker.price = price || "-";
+
+        if (this.currentTicker?.name === ticker.name) {
+          this.graph.push(ticker.price);
         }
-
-        const normalizedPrice = 1 / price;
-        const formattedPrice =
-          normalizedPrice > 1
-            ? normalizedPrice.toFixed(2)
-            : normalizedPrice.toPrecision(2);
-        ticker.price = formattedPrice;
       });
-      // this.tickers.find((t) => t.name === tickerName).price =
-      //   exchangedData.USD > 1
-      //     ? exchangedData.USD.toFixed(2)
-      //     : exchangedData.USD.toPrecision(2);
-
-      // if (this.currentTicker?.name === tickerName) {
-      //   this.graph.push(exchangedData.USD);
-      // }
     },
 
     removeTicker(tickerToRemove) {
