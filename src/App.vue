@@ -265,7 +265,7 @@
 </template>
 
 <script>
-import { loadTickers } from "./api";
+import { subscribeToTicker, unsubscribeFromTicker } from "./api";
 
 export default {
   name: "App",
@@ -302,9 +302,14 @@ export default {
 
     if (tickersList) {
       this.tickers = JSON.parse(tickersList);
+      this.tickers.forEach((ticker) =>
+        subscribeToTicker(ticker.name, (newPrice) =>
+          this.updateTicker(ticker.name, newPrice)
+        )
+      );
     }
 
-    setInterval(this.updateTickers, 5000);
+    setInterval(this.updateTicker, 5000);
   },
 
   async mounted() {
@@ -388,6 +393,10 @@ export default {
         this.ticker = "";
         this.filter = "";
 
+        subscribeToTicker(newTicker.name, (newPrice) =>
+          this.updateTicker(newTicker.name, newPrice)
+        );
+
         this.hintCoints = [];
       } else {
         this.isCoinExist = null;
@@ -402,28 +411,21 @@ export default {
       return price > 1 ? price.toFixed(2) : price.toPrecision(2);
     },
 
-    async updateTickers() {
-      if (!this.tickers.length) {
-        return;
-      }
-      const exchangedData = await loadTickers(
-        this.tickers.map((ticker) => ticker.name)
-      );
-
-      this.tickers.forEach((ticker) => {
-        const price = exchangedData[ticker.name.toUpperCase()];
-
-        ticker.price = price || "-";
-
-        if (this.currentTicker?.name === ticker.name) {
-          this.graph.push(ticker.price);
-        }
-      });
+    updateTicker(tickerName, price) {
+      this.tickers
+        .filter((ticker) => ticker.name === tickerName)
+        .forEach((ticker) => {
+          if (ticker.name === this.currentTicker?.name) {
+            this.graph.push(price);
+          }
+          ticker.price = price;
+        });
     },
 
     removeTicker(tickerToRemove) {
       this.tickers = this.tickers.filter((ticker) => ticker !== tickerToRemove);
       this.currentTicker = null;
+      unsubscribeFromTicker(tickerToRemove.name);
     },
 
     selectTicker(ticker) {
